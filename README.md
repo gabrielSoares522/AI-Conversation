@@ -1,9 +1,9 @@
 # Instruções
-1. criar arquivo com openai.key para armazenar a key da API da openai.
+1. Baixar LM Studio
 
-2. instalar as dependencias no arquivo requirements.txt
+2. Baixar modelo do ReedSeek R1 Distill Qwen
 
-2. instalar pyaudio
+3. instalar as dependencias no arquivo requirements.txt
 
 # Comandos
 sudo update-alternatives --install /usr/bin/python python /usr/bin python3 10

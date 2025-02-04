@@ -5,52 +5,37 @@ from gtts import gTTS
 from playsound import playsound
 import os
 import pathlib
-import openai
 import json
+import requests
 
 class Conversation:
+    languages = ["en-US","es-ES","pt-BR"]
+    
     def __init__(self):
-        with open('openai.key', 'r') as file:
-            openai.api_key = file.read().rstrip()
+        self.language = self.languages[0]
 
-        self.languages=["es-ES","en-US","pt-BR"]
-        self.language = self.languages[2]
-
-        match self.language:
-            case 'en-US':
-                self.messages = [{"role": "system", "content": "You are a helpful assistant called Sarah."}]
-            case 'es-ES':
-                self.messages = [{"role": "system", "content": "Eres una asistente útil llamada Sara."}]
-            case 'pt-BR':
-                self.messages = [{"role": "system", "content": "Você é um assistente prestativa chamada Sarah."}]
-            case _:
-                self.messages = [{"role": "system", "content": "You are a helpful assistant called Sarah."}]
-        
-        self.r = sr.Recognizer()
-        self.mic = sr.Microphone()#device_index=2)
+        if self.language == 'en-US':
+            self.messages = [{"role": "user", "content": "You are an assistant named Sarah and you must respond when spoken to."},
+        {"role": "assistant", "content": "Thank you! I'm here to help with any questions or needs you may have. What do you want me to do for you?"}]
+        elif self.language == 'es-ES':
+            self.messages = [{"role": "system", "content": "Eres una asistente útil llamada Sara."}]
+        elif self.language == 'pt-BR':
+            self.messages = [{"role": "system", "content": "Eu sou um assistente prestativa chamada Sarah."}]
     
     def addMessage(self, message, role):
         self.messages.append({"role": role, "content": message})
         print(role+": "+message)
 
-    def getAnswer(self,dummy=False):
-        if dummy:
-            match self.language:
-                case 'en-US':
-                    return json.loads('{"choices": [{"message": {"content": "Sorry, I didn\'t understand. Can you repeat?"}}]}')
-                case 'es-ES':
-                    return json.loads('{"choices": [{"message": {"content": "Lo siento, no entendí. ¿Puede repetir?"}}]}')
-                case 'pt-BR':
-                    return json.loads('{"choices": [{"message": {"content": "Desculpe, não entendi. Pode repetir?"}}]}')
-                case _:
-                    return json.loads('{"choices": [{"message": {"content": "Sorry, I didn\'t understand. Can you repeat?"}}]}')
-        else:
-            return openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=self.messages,
-                temperature=1,
-                max_tokens=200
-            )
+    def getAnswer(self):
+        url = 'http://127.0.0.1:1234/v1/chat/completions'
+        body = {
+            "model": "deepseek-chat",
+            "messages": self.messages,
+            "stream": False
+        }
+
+        x = requests.post(url, json = body)
+        return x
 
     def clear(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -67,26 +52,36 @@ class Conversation:
     def generateAudio(self, text):
         myobj = gTTS(text=text, lang = self.language.split("-")[0], slow=False)
         fileName = self.generateNameRandom()+".mp3"
-        filePath = os.path.dirname(os.path.abspath(__file__))+"/audios/"+fileName
+        filePath = os.path.dirname(os.path.abspath(__file__))+"\\audios\\"+fileName
         myobj.save(filePath)
         return filePath
-    
+
     def main(self):
         self.clear()
+
+        r = sr.Recognizer()
+        mic = sr.Microphone()
+
+        with mic as source:
+            r.adjust_for_ambient_noise(source) 
+
         print("Starting...")
 
+        
         while True:
             words = ""
             dontSendMessage = False
-            with self.mic as source:
-                audio = self.r.listen(source)
 
+            with mic as source:
+                print("listening...")
+                audio = r.listen(source)
+            
             try:
-                words = self.r.recognize_google(audio, language=self.language)
+                words = r.recognize_google(audio, language=self.language)
                 self.addMessage(words, "user")
             except sr.UnknownValueError:
                 dontSendMessage = True
-                print("???")
+                print("I can't understand you")
             except sr.RequestError:
                 print("Internet disconnected")
                 dontSendMessage = True
@@ -106,26 +101,42 @@ class Conversation:
                 print("Too much large")
                 dontSendMessage = True
             except Exception as e:
-                print(e)
+                print("error: ",e)
                 dontSendMessage = True
             
             if dontSendMessage or words == "":
                 continue
 
+            words = words.lower()
+            
+            try:
+                if words.find("open") == 0:
+                    programName = words[5:]
+                    print("Opening "+programName+"...")
+                    os.system("start "+programName)#+"://")
+                    continue
+                #subprocess.Popen(['C:\Program Files\Mozilla Firefox\\firefox.exe', '-new-tab'])
+            except Exception as e:
+                print("open error: ", e)
+
             if words == "today" or words == "hoje" or words == "hoy":
                 print(date.today())
+                continue
             
             if words == "change to english" or words == "cambiar a inglés" or words == "mudar para inglês":
                 self.setLanguage(1)
                 print("Language changed to English")
+                continue
 
             if words == "change to spanish" or words == "cambiar a español" or words == "mudar para espanhol":
                 self.setLanguage(0)
                 print("Language changed to Spanish")
+                continue
 
             if words == "change to portuguese" or words == "cambiar a portugués" or words == "mudar para português":
                 self.setLanguage(2)
                 print("Language changed to Portuguese")
+                continue
             
             if words == "exit" or words == "quit" or words =="sair" or words == "fechar" or words =="salir" or words == "cerrar":
                 for i in range(3):
@@ -135,12 +146,18 @@ class Conversation:
                 print("Goodbye")
                 break
             
-            response = self.getAnswer(dummy=True)
-            wordsResponse = response['choices'][0]['message']["content"]
-            self.addMessage(wordsResponse, "system")
+            response = self.getAnswer()
+            wordsResponse = response.json()['choices'][0]['message']["content"]
             
-            filePath = self.generateAudio(wordsResponse)
-            playsound(filePath)
+            wordsAnswers = wordsResponse.split("</think>")[1]
+
+            wordsAnswers = wordsAnswers.replace("\n","")
+            
+            self.addMessage(wordsAnswers, "assistant")
+
+            filePath = self.generateAudio(wordsAnswers)
+            
+            playsound(os.path.abspath(filePath))
 
 controller = Conversation()
 controller.main()
