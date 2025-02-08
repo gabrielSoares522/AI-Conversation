@@ -1,2 +1,3 @@
 openai.key
 audios/**.mp3
+__pycache__
