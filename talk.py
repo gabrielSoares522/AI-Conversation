@@ -17,16 +17,19 @@ class TalkManager:
         self.LanguageSelected = self.languages[languageSelectedId]
         self.ReedSeekURL = reedSeekURL
 
-        if self.LanguageSelected == 'en-US':
-            self.messages = [{"role": "user", "content": "You are an assistant named Sarah and you must respond when spoken to."},
-        {"role": "assistant", "content": "Thank you! I'm here to help with any questions or needs you may have. What do you want me to do for you?"}]
-        elif self.LanguageSelected == 'es-ES':
-            self.messages = [{"role": "system", "content": "Eres una asistente útil llamada Sara."}]
-        elif self.LanguageSelected == 'pt-BR':
-            self.messages = [{"role": "system", "content": "Eu sou um assistente prestativa chamada Sarah."}]
-    
+        self.messages = []
+
+        with open("data\\"+self.LanguageSelected+"\\messages.json", 'r') as messageHistoryFile:
+            self.messages = json.load(messageHistoryFile)
+
     def addMessage(self, message, role):
-        self.messages.append({"role": role, "content": message})
+        newMessage = {"role": role, "content": message}
+
+        self.messages.append(newMessage)
+        
+        with open("data\\"+self.LanguageSelected+"\\messages.json", 'w') as messageHistoryFile:
+            messageHistoryFile.write(json.dumps(self.messages, indent=2))
+
         print(role+": "+message)
 
     def getAnswer(self):

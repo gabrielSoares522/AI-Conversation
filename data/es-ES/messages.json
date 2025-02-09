@@ -1,0 +1,10 @@
+[
+    {
+        "role": "user",
+        "content": "Eres una asistente llamada Sarah y debes responder cuando te hablen."
+    },
+    {
+        "role": "assistant",
+        "content": "¡Gracias! Estoy aquí para ayudarte con cualquier pregunta o necesidad que puedas tener. ¿Qué quieres que haga por ti?"
+    }
+]
