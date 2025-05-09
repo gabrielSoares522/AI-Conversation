@@ -7,8 +7,12 @@ import pathlib
 import json
 import requests
 import asyncio
-from io import BytesIO
+import io
 from aiogtts import aiogTTS
+from pydub import AudioSegment
+from pydub.playback import play
+import keyboard
+from gtts import gTTS
 
 class TalkManager:
     languages = ["en-US","es-ES","pt-BR"]
@@ -19,17 +23,16 @@ class TalkManager:
 
         self.messages = []
 
-        with open("data\\"+self.LanguageSelected+"\\messages.json", 'r') as messageHistoryFile:
+        with open("data\\"+self.LanguageSelected+"\\messages.json", 'r', encoding='utf8') as messageHistoryFile:
             self.messages = json.load(messageHistoryFile)
 
     def addMessage(self, message, role):
         newMessage = {"role": role, "content": message}
-
         self.messages.append(newMessage)
         
-        with open("data\\"+self.LanguageSelected+"\\messages.json", 'w') as messageHistoryFile:
-            messageHistoryFile.write(json.dumps(self.messages, indent=2))
-
+        #with open("data\\"+self.LanguageSelected+"\\messages.json", 'w', encoding='utf8') as messageHistoryFile:
+        #    messageHistoryFile.write(json.dumps(self.messages, indent=2))
+        
         print(role+": "+message)
 
     def getAnswer(self):
@@ -59,22 +62,34 @@ class TalkManager:
         self.LanguageSelected = self.languages[languageIndex]
         print("Language changed to "+self.LanguageSelected)
     
-    async def generateAudio(self, text, autoPlay=False):
+    async def generateAudioAsync(self, textAudio):
         fileName = self.generateNameRandom()+".mp3"
         filePath = os.path.dirname(os.path.abspath(__file__))+"\\audios\\"+fileName
 
-        #fileGenerator = gTTS(text=text, lang = self.LanguageSelected.split("-")[0], slow=False)
+        #fileGenerator = gTTS(text=textAudio, lang = self.LanguageSelected, slow=False)
         #fileGenerator.save(filePath)
         
         aiogtts = aiogTTS()
-        #io = BytesIO()
-        await aiogtts.save(text, filePath, lang=self.LanguageSelected.split("-")[0])
-        #await aiogtts.write_to_fp(text, io, slow=True, lang=self.LanguageSelected.split("-")[0])
-        if autoPlay:
-            playsound(filePath)
+        
+        #await aiogtts.save(textAudio, filePath, lang=self.LanguageSelected)
+        #playsound(filePath)
+        
+        ioData = io.BytesIO()
+        await aiogtts.write_to_fp(text=textAudio, fp=ioData, slow=True, lang=self.LanguageSelected)
+        song = AudioSegment.from_file(ioData, format="mp3")
+        play(song)
+
+    def generateAudio(self, textAudio):
+        fileName = self.generateNameRandom()+".mp3"
+        filePath = os.path.dirname(os.path.abspath(__file__))+"\\audios\\"+fileName
+
+        tts = gTTS(textAudio, lang = self.LanguageSelected)
+        tts.save(filePath)
+        playsound(filePath)
 
     def run(self):
         self.clear()
+        print(self.messages[0])
 
         reco = sr.Recognizer()
         mic = sr.Microphone()
@@ -85,14 +100,17 @@ class TalkManager:
         print("Starting...")
 
         while True:
+            loop = asyncio.get_event_loop()
+            
             words = ""
             dontSendMessage = False
-
-            with mic as source:
-                print("listening...")
-                audio = reco.listen(source)
-            
+          
             try:
+                with mic as source:                        
+                    reco.adjust_for_ambient_noise(source)
+                    #print("Listening....")
+                    audio = reco.listen(source, timeout = 5, phrase_time_limit = 7)
+
                 words = reco.recognize_google(audio, language=self.LanguageSelected)
                 self.addMessage(words, "user")
             except sr.UnknownValueError:
@@ -119,7 +137,7 @@ class TalkManager:
             except Exception as e:
                 print("error: ",e)
                 dontSendMessage = True
-            
+
             if dontSendMessage or words == "":
                 continue
 
@@ -159,6 +177,7 @@ class TalkManager:
                     print("...")
                     sleep(1)
                 
+                loop.run_until_complete(self.generateAudio("Goodbye"))
                 print("Goodbye")
                 break
             
@@ -176,8 +195,7 @@ class TalkManager:
             
             self.addMessage(wordsAnswers, "assistant")
             
-            loop = asyncio.get_event_loop()
-
-            loop.run_until_complete(self.generateAudio(wordsAnswers,True))
+            self.generateAudio(wordsAnswers)
+            #loop.run_until_complete(self.generateAudioAsync(wordsAnswers))#,True))
             
             

@@ -2,9 +2,5 @@
   {
     "role": "user",
     "content": "You are an assistant named Sarah and you must respond when spoken to."
-  },
-  {
-    "role": "assistant",
-    "content": "Thank you! I'm here to help with any questions or needs you may have. What do you want me to do for you?"
   }
 ]
